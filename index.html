@@ -261,6 +261,8 @@ th{
 }
 tbody tr:hover{background:#f8fbff}
 .subject{font-weight:bold;color:var(--navy)}
+.col-hari{display:none}
+.mode-cari .col-hari{display:table-cell;font-weight:bold;color:#315c9b}
 .time{
   display:inline-block;background:#edf4ff;
   color:#315c9b;border-radius:6px;
@@ -459,7 +461,7 @@ footer{text-align:center;color:#8290a5;font-size:12px;padding:8px 0 20px}
         <h2>📅 Jadwal Pelajaran</h2>
         <div class="toolbar">
           <input type="search" id="search"
-                 placeholder="Cari mata pelajaran...">
+                 placeholder="Cari mapel / guru di semua hari...">
           <button class="primary" id="tambahButton">+ Tambah</button>
         </div>
       </div>
@@ -482,6 +484,7 @@ footer{text-align:center;color:#8290a5;font-size:12px;padding:8px 0 20px}
           <thead>
             <tr>
               <th>No.</th>
+              <th class="col-hari">Hari</th>
               <th>Waktu</th>
               <th>Mata Pelajaran</th>
               <th>Nama Guru</th>
@@ -629,7 +632,8 @@ $("switchButton").addEventListener("click", function() {
 $("loginForm").addEventListener("submit", async function(e) {
   e.preventDefault();
 
-  const username = $("username").value.trim().toLowerCase();
+  // Kalau yang diketik "admin@jadwal-xd.app", ambil "admin"-nya saja
+  const username = $("username").value.trim().toLowerCase().replace(DOMAIN_USERNAME, "");
   const password = $("password").value;
   const email = username + DOMAIN_USERNAME;   // admin -> admin@jadwal-xd.app
   const error = $("errorLogin");
@@ -668,6 +672,10 @@ $("loginForm").addEventListener("submit", async function(e) {
       error.textContent = "Terlalu banyak percobaan. Tunggu beberapa menit.";
     } else if (err.code === "auth/network-request-failed") {
       error.textContent = "Tidak ada koneksi internet.";
+    } else if (String(err.code).includes("api-key")) {
+      error.textContent = "Pengaturan Firebase (apiKey) salah. Cek firebaseConfig di index.html.";
+    } else if (err.code === "auth/operation-not-allowed") {
+      error.textContent = "Login Email/Password belum diaktifkan di Firebase.";
     } else if (modeDaftar) {
       error.textContent = "Gagal mendaftar. Coba lagi.";
     } else {
@@ -794,18 +802,28 @@ function renderSchedule() {
   const keyword = $("search").value.toLowerCase().trim();
   const jadwalHariIni = schedule.filter(item => item.day === selectedDay);
 
-  const results = jadwalHariIni
+  // Kalau sedang mencari: cari di SEMUA hari. Kalau tidak: tampilkan hari yang dipilih.
+  const mencari = keyword !== "";
+  const sumber = mencari ? schedule : jadwalHariIni;
+
+  const results = sumber
     .filter(item =>
       item.subject.toLowerCase().includes(keyword) ||
       item.teacher.toLowerCase().includes(keyword) ||
-      item.time.toLowerCase().includes(keyword)
+      item.time.toLowerCase().includes(keyword) ||
+      item.day.toLowerCase().includes(keyword)
     )
-    .sort(urutJam);
+    // Urutkan per hari (Senin dulu), lalu per jam
+    .sort((a, b) => DAYS.indexOf(a.day) - DAYS.indexOf(b.day) || urutJam(a, b));
+
+  // Kolom "Hari" cuma muncul saat mencari
+  $("scheduleTable").classList.toggle("mode-cari", mencari);
 
   $("scheduleBody").innerHTML = results.map(
     (item, index) => `
       <tr>
         <td>${index + 1}</td>
+        <td class="col-hari">${escapeHTML(item.day)}</td>
         <td><span class="time">${escapeHTML(item.time)}</span></td>
         <td class="subject">${escapeHTML(item.subject)}</td>
         <td>${escapeHTML(item.teacher)}</td>
@@ -825,8 +843,8 @@ function renderSchedule() {
   else if (schedule.length === 0) pesan = isAdmin
     ? "Database masih kosong. Tambah jadwal baru, atau isi dengan jadwal contoh."
     : "Belum ada jadwal. Tunggu admin kelas mengisi jadwal.";
+  else if (mencari) pesan = "Tidak ada jadwal yang cocok dengan “" + $("search").value.trim() + "” di hari mana pun.";
   else if (jadwalHariIni.length === 0) pesan = "Belum ada jadwal hari " + selectedDay + ".";
-  else if (results.length === 0) pesan = "Tidak ada jadwal yang cocok dengan pencarian.";
   $("emptyMessage").textContent = pesan;
   $("emptyBox").classList.toggle("hidden", results.length > 0);
   $("seedButton").classList.toggle("hidden", !(loaded && schedule.length === 0));
@@ -834,10 +852,14 @@ function renderSchedule() {
 
   // Judul
   $("pageTitle").textContent = view === "beranda" ? "Beranda" : "Jadwal " + selectedDay;
-  $("dayHeading").textContent = "Jadwal Hari " + selectedDay;
-  $("daySubheading").textContent = loaded
-    ? results.length + " mata pelajaran ditampilkan"
-    : "Memuat jadwal...";
+  $("dayHeading").textContent = mencari
+    ? "Hasil pencarian “" + $("search").value.trim() + "”"
+    : "Jadwal Hari " + selectedDay;
+  $("daySubheading").textContent = !loaded
+    ? "Memuat jadwal..."
+    : mencari
+      ? results.length + " jadwal ditemukan di semua hari"
+      : results.length + " mata pelajaran ditampilkan";
 
   // Statistik (dihitung dari data)
   const mapelUnik = new Set(schedule.map(item => item.subject.toLowerCase()));
@@ -848,7 +870,8 @@ function renderSchedule() {
 
   // Tombol yang aktif (cuma satu yang nyala di sidebar)
   document.querySelectorAll(".day-tab").forEach(button => {
-    button.classList.toggle("active", button.dataset.day === selectedDay);
+    // Saat mencari, tidak ada tab hari yang aktif (karena hasilnya dari semua hari)
+    button.classList.toggle("active", !mencari && button.dataset.day === selectedDay);
   });
   document.querySelector('[data-view="beranda"]')
     .classList.toggle("active", view === "beranda");
