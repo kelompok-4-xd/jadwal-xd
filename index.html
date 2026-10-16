@@ -290,6 +290,9 @@ tbody tr:hover{background:#f8fbff}
 .log-body strong{color:var(--navy)}
 .log-hari{color:var(--muted)}
 .log-meta{color:var(--muted);font-size:12px}
+.log-del{margin-left:auto;flex:none}
+.hapus-semua{background:#ffe5e5;color:#b42323}
+.hapus-semua:disabled{opacity:.6;cursor:wait}
 
 /* DAFTAR SISWA */
 .role{display:inline-block;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:bold}
@@ -430,7 +433,7 @@ footer{text-align:center;color:#8290a5;font-size:12px;padding:8px 0 20px}
     <button class="nav-button" data-view="mingguan">
       🗓️ <span class="nav-text">Jadwal Mingguan</span>
     </button>
-    <button class="nav-button" data-view="riwayat">
+    <button class="nav-button admin-only" data-view="riwayat">
       🕘 <span class="nav-text">Riwayat Perubahan</span>
     </button>
     <button class="nav-button admin-only" data-view="pengguna">
@@ -596,6 +599,7 @@ footer{text-align:center;color:#8290a5;font-size:12px;padding:8px 0 20px}
     <section class="panel hidden" id="panelRiwayat">
       <div class="panel-heading">
         <h2>🕘 Riwayat Perubahan Jadwal</h2>
+        <button class="secondary hapus-semua" id="hapusSemuaRiwayat" type="button">🗑 Hapus Semua Riwayat</button>
       </div>
       <p class="panel-note">50 perubahan terakhir, yang paling baru di atas.</p>
       <ul class="log-list" id="riwayatList"></ul>
@@ -666,7 +670,7 @@ const ADMIN_USERNAMES = ["admin"];
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
-  getFirestore, collection, doc, setDoc, onSnapshot, writeBatch,
+  getFirestore, collection, doc, setDoc, deleteDoc, getDocs, onSnapshot, writeBatch,
   query, orderBy, limit, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
@@ -855,19 +859,20 @@ function mulaiDengarDatabase() {
     showToast("Gagal memuat jadwal. Cek koneksi internet lalu refresh halaman.");
   }));
 
-  // b) Riwayat perubahan (50 terakhir, terbaru di atas)
-  const riwayatTerbaru = query(riwayatCol, orderBy("waktu", "desc"), limit(50));
-  stopListening.push(onSnapshot(riwayatTerbaru, function(snapshot) {
-    riwayat = snapshot.docs.map(d => ({ id: d.id, ...d.data({ serverTimestamps: "estimate" }) }));
-    riwayatLoaded = true;
-    render();
-  }, function() {
-    riwayatLoaded = true;
-    render();
-  }));
-
-  // c) Daftar pengguna (cuma admin yang boleh baca)
+  // b) & c) Khusus admin: riwayat perubahan dan daftar pengguna
   if (isAdmin) {
+    // Riwayat perubahan (50 terakhir, terbaru di atas)
+    const riwayatTerbaru = query(riwayatCol, orderBy("waktu", "desc"), limit(50));
+    stopListening.push(onSnapshot(riwayatTerbaru, function(snapshot) {
+      riwayat = snapshot.docs.map(d => ({ id: d.id, ...d.data({ serverTimestamps: "estimate" }) }));
+      riwayatLoaded = true;
+      render();
+    }, function() {
+      riwayatLoaded = true;
+      render();
+    }));
+
+    // Daftar pengguna
     stopListening.push(onSnapshot(penggunaCol, function(snapshot) {
       pengguna = snapshot.docs.map(d => ({ id: d.id, ...d.data({ serverTimestamps: "estimate" }) }));
       penggunaLoaded = true;
@@ -1142,6 +1147,7 @@ function renderRiwayat() {
           <div>${escapeHTML(r.detail)}</div>
           <div class="log-meta">oleh ${escapeHTML(r.oleh)} · ${formatWaktu(r.waktu)}</div>
         </div>
+        <button class="action-btn delete log-del" data-hapus-riwayat="${escapeHTML(r.id)}">🗑 Hapus</button>
       </li>`;
   }).join("");
 
@@ -1150,7 +1156,42 @@ function renderRiwayat() {
     ? "Memuat riwayat..."
     : "Belum ada perubahan jadwal yang tercatat.";
   $("riwayatKosong").classList.toggle("hidden", !kosong);
+  $("hapusSemuaRiwayat").classList.toggle("hidden", riwayat.length === 0);
 }
+
+// Hapus satu catatan riwayat
+$("riwayatList").addEventListener("click", async event => {
+  const button = event.target.closest("button[data-hapus-riwayat]");
+  if (!button) return;
+  button.disabled = true;
+  try {
+    await deleteDoc(doc(riwayatCol, button.dataset.hapusRiwayat));
+    showToast("Catatan riwayat dihapus.");
+  } catch (error) {
+    button.disabled = false;
+    showToast("Gagal menghapus riwayat. Cek koneksi internet.");
+  }
+});
+
+// Hapus SEMUA catatan riwayat (bukan cuma 50 yang tampil)
+$("hapusSemuaRiwayat").addEventListener("click", async () => {
+  if (!confirm("Hapus semua riwayat perubahan? Ini tidak bisa dibatalkan.\n(Data jadwal tidak ikut terhapus.)")) return;
+  $("hapusSemuaRiwayat").disabled = true;
+  try {
+    const semua = await getDocs(riwayatCol);
+    // Firebase membatasi 500 tulisan per batch, jadi dihapus per 500
+    for (let i = 0; i < semua.docs.length; i += 500) {
+      const batch = writeBatch(db);
+      semua.docs.slice(i, i + 500).forEach(d => batch.delete(d.ref));
+      await batch.commit();
+    }
+    showToast(semua.docs.length + " catatan riwayat dihapus.");
+  } catch (error) {
+    showToast("Gagal menghapus riwayat. Cek koneksi internet.");
+  } finally {
+    $("hapusSemuaRiwayat").disabled = false;
+  }
+});
 
 // ---- Daftar siswa (khusus admin) ----
 function renderPengguna() {
@@ -1180,7 +1221,8 @@ function renderPengguna() {
 // =============================
 
 function bukaHalaman(halaman) {
-  if (halaman === "pengguna" && !isAdmin) halaman = "beranda";
+  // Halaman khusus admin
+  if ((halaman === "pengguna" || halaman === "riwayat") && !isAdmin) halaman = "beranda";
   view = halaman;
   if (halaman === "beranda") selectedDay = hariIni();
   if (DAYS.includes(halaman)) selectedDay = halaman;
