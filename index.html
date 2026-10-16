@@ -261,6 +261,41 @@ th{
 }
 tbody tr:hover{background:#f8fbff}
 .subject{font-weight:bold;color:var(--navy)}
+.readonly .admin-only{display:none!important}
+.panel-note{color:var(--muted);font-size:13px;margin:-6px 0 16px}
+
+/* JADWAL MINGGUAN */
+.week-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+.week-col{border:1px solid var(--border);border-radius:12px;overflow:hidden;background:#fbfcff;min-width:0}
+.week-col.today{border-color:var(--blue);box-shadow:0 0 0 2px #2563eb22}
+.week-head{background:#eef5ff;color:var(--navy);font-weight:bold;padding:11px 13px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.week-head span{font-weight:normal;font-size:12px;color:var(--muted)}
+.week-col.today .week-head{background:var(--blue);color:white}
+.week-col.today .week-head span{color:#dbe6ff}
+.week-item{padding:10px 13px;border-top:1px solid #e8edf5;display:flex;flex-direction:column;gap:4px;font-size:13px}
+.week-item strong{color:var(--navy)}
+.week-item small{color:var(--muted)}
+.week-item .time{align-self:flex-start;padding:3px 7px;font-size:12px}
+.week-empty{padding:16px 13px;color:var(--muted);font-size:13px}
+
+/* RIWAYAT PERUBAHAN */
+.log-list{list-style:none;margin:0;padding:0}
+.log{display:flex;gap:12px;padding:13px 4px;border-bottom:1px solid #e8edf5;align-items:flex-start}
+.tag{flex:none;font-size:11px;font-weight:bold;border-radius:6px;padding:5px 8px;min-width:96px;text-align:center}
+.tag-tambah{background:#d9f8e9;color:#146c43}
+.tag-edit{background:#fff0c4;color:#825800}
+.tag-hapus{background:#ffe5e5;color:#b42323}
+.tag-kembali{background:#e4efff;color:#1d4ed8}
+.log-body{min-width:0;font-size:13px;line-height:1.55}
+.log-body strong{color:var(--navy)}
+.log-hari{color:var(--muted)}
+.log-meta{color:var(--muted);font-size:12px}
+
+/* DAFTAR SISWA */
+.role{display:inline-block;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:bold}
+.role-admin{background:#e4efff;color:#1d4ed8}
+.role-siswa{background:#f2f6fc;color:#536783}
+
 .col-hari{display:none}
 .mode-cari .col-hari{display:table-cell;font-weight:bold;color:#315c9b}
 .time{
@@ -392,6 +427,15 @@ footer{text-align:center;color:#8290a5;font-size:12px;padding:8px 0 20px}
     <button class="nav-button active" data-view="beranda">
       🏠 <span class="nav-text">Beranda</span>
     </button>
+    <button class="nav-button" data-view="mingguan">
+      🗓️ <span class="nav-text">Jadwal Mingguan</span>
+    </button>
+    <button class="nav-button" data-view="riwayat">
+      🕘 <span class="nav-text">Riwayat Perubahan</span>
+    </button>
+    <button class="nav-button admin-only" data-view="pengguna">
+      👥 <span class="nav-text">Daftar Siswa</span>
+    </button>
 
     <div class="nav-label">JADWAL HARIAN</div>
 
@@ -456,7 +500,7 @@ footer{text-align:center;color:#8290a5;font-size:12px;padding:8px 0 20px}
       </div>
     </section>
 
-    <section class="panel">
+    <section class="panel" id="panelJadwal">
       <div class="panel-heading">
         <h2>📅 Jadwal Pelajaran</h2>
         <div class="toolbar">
@@ -539,6 +583,47 @@ footer{text-align:center;color:#8290a5;font-size:12px;padding:8px 0 20px}
       </form>
     </section>
 
+    <!-- JADWAL MINGGUAN: semua hari dalam satu halaman -->
+    <section class="panel hidden" id="panelMingguan">
+      <div class="panel-heading">
+        <h2>🗓️ Jadwal Mingguan</h2>
+      </div>
+      <p class="panel-note">Semua jadwal Senin sampai Jumat. Kolom hari ini diberi warna biru.</p>
+      <div class="week-grid" id="weekGrid"></div>
+    </section>
+
+    <!-- RIWAYAT PERUBAHAN: catatan setiap jadwal ditambah/diubah/dihapus -->
+    <section class="panel hidden" id="panelRiwayat">
+      <div class="panel-heading">
+        <h2>🕘 Riwayat Perubahan Jadwal</h2>
+      </div>
+      <p class="panel-note">50 perubahan terakhir, yang paling baru di atas.</p>
+      <ul class="log-list" id="riwayatList"></ul>
+      <div class="empty hidden" id="riwayatKosong"></div>
+    </section>
+
+    <!-- DAFTAR SISWA: khusus admin -->
+    <section class="panel hidden" id="panelPengguna">
+      <div class="panel-heading">
+        <h2>👥 Daftar Siswa Terdaftar</h2>
+      </div>
+      <p class="panel-note" id="penggunaInfo">Memuat...</p>
+      <div class="table-wrap">
+        <table id="penggunaTable">
+          <thead>
+            <tr>
+              <th>No.</th>
+              <th>Username</th>
+              <th>Peran</th>
+              <th>Tanggal Daftar</th>
+              <th>Terakhir Aktif</th>
+            </tr>
+          </thead>
+          <tbody id="penggunaBody"></tbody>
+        </table>
+      </div>
+    </section>
+
     <div class="quote">
       💡 <strong>Pesan hari ini:</strong>
       “Pengetahuan yang kamu bangun hari ini adalah investasi yang tidak akan pernah bisa diambil oleh siapapun.”
@@ -581,8 +666,8 @@ const ADMIN_USERNAMES = ["admin"];
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
-  getFirestore, collection, doc, addDoc, updateDoc,
-  deleteDoc, setDoc, onSnapshot, writeBatch
+  getFirestore, collection, doc, setDoc, onSnapshot, writeBatch,
+  query, orderBy, limit, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
@@ -592,20 +677,30 @@ import {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
-const jadwalCol = collection(db, "jadwal");   // tempat data jadwal di database
+
+// Tempat data di database
+const jadwalCol = collection(db, "jadwal");      // jadwal pelajaran
+const riwayatCol = collection(db, "riwayat");    // catatan perubahan jadwal
+const penggunaCol = collection(db, "pengguna");  // daftar akun yang terdaftar
 
 const $ = id => document.getElementById(id);
 const DAYS = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat"];
 
 let schedule = [];          // semua jadwal dari database
-let loaded = false;         // data sudah dimuat atau belum
-let view = "beranda";       // halaman yang dibuka: "beranda" atau nama hari
+let riwayat = [];           // 50 perubahan terakhir
+let pengguna = [];          // semua akun (khusus admin)
+let loaded = false;         // jadwal sudah dimuat atau belum
+let riwayatLoaded = false;
+let penggunaLoaded = false;
+
+let view = "beranda";       // halaman: "beranda", "mingguan", "riwayat", "pengguna", atau nama hari
 let selectedDay = hariIni();
 let editingId = null;       // id jadwal yang sedang diedit
-let stopListening = null;   // untuk berhenti dengar database saat logout
+let stopListening = [];     // untuk berhenti dengar database saat logout
 let undoData = null;        // data untuk tombol "Urungkan"
 let toastTimer = null;
 let isAdmin = false;        // true kalau yang login adalah admin
+let currentUsername = "";   // username yang sedang login
 let modeDaftar = false;     // false = form login, true = form daftar akun
 
 // =============================
@@ -694,24 +789,29 @@ $("logoutButton").addEventListener("click", function() {
 // Login tetap tersimpan walaupun halaman di-refresh.
 onAuthStateChanged(auth, function(user) {
   if (user) {
-    const username = user.email.replace(DOMAIN_USERNAME, "");
-    isAdmin = ADMIN_USERNAMES.includes(username);
+    currentUsername = user.email.replace(DOMAIN_USERNAME, "");
+    isAdmin = ADMIN_USERNAMES.includes(currentUsername);
 
-    // User biasa: tombol Tambah/Edit/Hapus disembunyikan
+    // User biasa: tombol Tambah/Edit/Hapus & menu admin disembunyikan
     document.body.classList.toggle("readonly", !isAdmin);
-    $("profileName").textContent = username;
+    $("profileName").textContent = currentUsername;
     $("profileRole").textContent = isAdmin ? "Admin · bisa mengedit" : "Siswa · hanya melihat";
 
     $("loginPage").classList.add("hidden");
     $("appPage").classList.remove("hidden");
     $("password").value = "";
     $("password2").value = "";
+
+    simpanDataPengguna(user);
     mulaiDengarDatabase();
+    bukaHalaman("beranda");
   } else {
     isAdmin = false;
-    if (stopListening) stopListening();
-    schedule = [];
-    loaded = false;
+    currentUsername = "";
+    stopListening.forEach(stop => stop());
+    stopListening = [];
+    schedule = []; riwayat = []; pengguna = [];
+    loaded = riwayatLoaded = penggunaLoaded = false;
     closeForm();
     $("appPage").classList.add("hidden");
     $("loginPage").classList.remove("hidden");
@@ -720,15 +820,27 @@ onAuthStateChanged(auth, function(user) {
   }
 });
 
+// Catat akun ini ke daftar pengguna (supaya admin bisa lihat siapa saja yang daftar)
+function simpanDataPengguna(user) {
+  setDoc(doc(penggunaCol, user.uid), {
+    username: currentUsername,
+    dibuat: user.metadata.creationTime || "",
+    terakhirMasuk: serverTimestamp()
+  }).catch(() => {});
+}
+
 // =============================
 // 2. AMBIL DATA DARI DATABASE (REAL-TIME)
 // Setiap ada perubahan dari perangkat mana pun,
-// fungsi ini jalan lagi dan tabel langsung ter-update.
+// fungsi ini jalan lagi dan tampilan langsung ter-update.
 // =============================
 
 function mulaiDengarDatabase() {
-  if (stopListening) stopListening();
-  stopListening = onSnapshot(jadwalCol, function(snapshot) {
+  stopListening.forEach(stop => stop());
+  stopListening = [];
+
+  // a) Jadwal pelajaran
+  stopListening.push(onSnapshot(jadwalCol, function(snapshot) {
     schedule = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
 
     // Kalau jadwal yang sedang diedit dihapus dari perangkat lain
@@ -738,10 +850,33 @@ function mulaiDengarDatabase() {
     }
 
     loaded = true;
-    renderSchedule();
+    render();
   }, function() {
     showToast("Gagal memuat jadwal. Cek koneksi internet lalu refresh halaman.");
-  });
+  }));
+
+  // b) Riwayat perubahan (50 terakhir, terbaru di atas)
+  const riwayatTerbaru = query(riwayatCol, orderBy("waktu", "desc"), limit(50));
+  stopListening.push(onSnapshot(riwayatTerbaru, function(snapshot) {
+    riwayat = snapshot.docs.map(d => ({ id: d.id, ...d.data({ serverTimestamps: "estimate" }) }));
+    riwayatLoaded = true;
+    render();
+  }, function() {
+    riwayatLoaded = true;
+    render();
+  }));
+
+  // c) Daftar pengguna (cuma admin yang boleh baca)
+  if (isAdmin) {
+    stopListening.push(onSnapshot(penggunaCol, function(snapshot) {
+      pengguna = snapshot.docs.map(d => ({ id: d.id, ...d.data({ serverTimestamps: "estimate" }) }));
+      penggunaLoaded = true;
+      render();
+    }, function() {
+      penggunaLoaded = true;
+      render();
+    }));
+  }
 }
 
 // =============================
@@ -752,6 +887,11 @@ function hariIni() {
   // getDay(): 0 = Minggu, 1 = Senin, ..., 6 = Sabtu
   // Sabtu/Minggu otomatis tampilkan Senin.
   return DAYS[new Date().getDay() - 1] || "Senin";
+}
+
+function hariSekolah() {
+  const d = new Date().getDay();
+  return d >= 1 && d <= 5;
 }
 
 // "07:30" -> 450 (menit), supaya bisa diurutkan dengan benar
@@ -773,13 +913,31 @@ function urutJam(a, b) {
 }
 
 function escapeHTML(value) {
-  return String(value).replace(/[&<>"']/g, char => ({
+  return String(value ?? "").replace(/[&<>"']/g, char => ({
     "&":"&amp;",
     "<":"&lt;",
     ">":"&gt;",
     '"':"&quot;",
     "'":"&#39;"
   })[char]);
+}
+
+// Ubah waktu dari database jadi teks, contoh: "16 Okt 2026, 22.47"
+function formatWaktu(waktu) {
+  if (!waktu || !waktu.toDate) return "-";
+  return waktu.toDate().toLocaleString("id-ID", {
+    day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit"
+  });
+}
+
+function formatTanggal(teks) {
+  const tanggal = new Date(teks);
+  if (isNaN(tanggal)) return "-";
+  return tanggal.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function ambilData(item) {
+  return { day: item.day, time: item.time, subject: item.subject, teacher: item.teacher };
 }
 
 function showToast(teks, undo = null) {
@@ -794,10 +952,85 @@ function showToast(teks, undo = null) {
   }, undo ? 7000 : 3500);
 }
 
+function pesanError(error) {
+  if (error && error.code === "permission-denied") return "Akun ini tidak punya izin mengubah jadwal.";
+  if (error && error.code === "not-found") return "Jadwal ini sudah dihapus dari perangkat lain.";
+  return "Gagal menyimpan. Cek koneksi internet lalu coba lagi.";
+}
+
 // =============================
-// 4. MENAMPILKAN JADWAL
+// 4. RIWAYAT PERUBAHAN
+// Setiap tambah/edit/hapus ikut menulis 1 catatan ke "riwayat".
+// Ditulis dalam 1 batch, jadi jadwal & catatannya selalu tersimpan bersamaan.
 // =============================
 
+function catatRiwayat(batch, aksi, item, detail) {
+  batch.set(doc(riwayatCol), {
+    aksi: aksi,                  // "tambah" / "edit" / "hapus" / "kembalikan" / "isi-contoh"
+    oleh: currentUsername,
+    waktu: serverTimestamp(),
+    hari: item.day,
+    mapel: item.subject,
+    detail: detail
+  });
+}
+
+function ringkasan(item) {
+  return item.day + ", " + item.time + ", " + item.teacher;
+}
+
+// Bandingkan data lama & baru, contoh: "jam 10:10 - 13:00 → 10:15 - 12:00"
+function apaYangBerubah(lama, baru) {
+  const berubah = [];
+  if (lama.subject !== baru.subject) berubah.push("mapel " + lama.subject + " → " + baru.subject);
+  if (lama.day !== baru.day) berubah.push("hari " + lama.day + " → " + baru.day);
+  if (lama.time !== baru.time) berubah.push("jam " + lama.time + " → " + baru.time);
+  if (lama.teacher !== baru.teacher) berubah.push("guru " + lama.teacher + " → " + baru.teacher);
+  return berubah.length ? berubah.join("; ") : "tidak ada yang berubah";
+}
+
+// =============================
+// 5. MENAMPILKAN HALAMAN
+// =============================
+
+function render() {
+  const halamanJadwal = view === "beranda" || DAYS.includes(view);
+
+  $("panelJadwal").classList.toggle("hidden", !halamanJadwal);
+  $("panelMingguan").classList.toggle("hidden", view !== "mingguan");
+  $("panelRiwayat").classList.toggle("hidden", view !== "riwayat");
+  $("panelPengguna").classList.toggle("hidden", view !== "pengguna");
+
+  const judul = {
+    beranda: "Beranda",
+    mingguan: "Jadwal Mingguan",
+    riwayat: "Riwayat Perubahan",
+    pengguna: "Daftar Siswa"
+  };
+  $("pageTitle").textContent = judul[view] || "Jadwal " + view;
+
+  // Statistik (dihitung dari data)
+  const mapelUnik = new Set(schedule.map(item => item.subject.toLowerCase()));
+  const hariAktif = new Set(schedule.map(item => item.day));
+  $("totalMapel").textContent = mapelUnik.size;
+  $("totalSesi").textContent = schedule.length;
+  $("totalHari").textContent = hariAktif.size + " Hari";
+
+  // Sidebar: cuma satu tombol yang nyala
+  document.querySelectorAll(".nav-button[data-view]").forEach(button => {
+    button.classList.toggle("active", button.dataset.view === view);
+  });
+  document.querySelectorAll(".nav-button[data-day]").forEach(button => {
+    button.classList.toggle("active", button.dataset.day === view);
+  });
+
+  if (halamanJadwal) renderSchedule();
+  if (view === "mingguan") renderMingguan();
+  if (view === "riwayat") renderRiwayat();
+  if (view === "pengguna") renderPengguna();
+}
+
+// ---- Jadwal per hari ----
 function renderSchedule() {
   const keyword = $("search").value.toLowerCase().trim();
   const jadwalHariIni = schedule.filter(item => item.day === selectedDay);
@@ -829,9 +1062,9 @@ function renderSchedule() {
         <td>${escapeHTML(item.teacher)}</td>
         <td class="col-action">
           <button class="action-btn edit"
-            data-action="edit" data-id="${item.id}">✏ Edit</button>
+            data-action="edit" data-id="${escapeHTML(item.id)}">✏ Edit</button>
           <button class="action-btn delete"
-            data-action="delete" data-id="${item.id}">🗑 Hapus</button>
+            data-action="delete" data-id="${escapeHTML(item.id)}">🗑 Hapus</button>
         </td>
       </tr>
     `
@@ -851,7 +1084,6 @@ function renderSchedule() {
   $("scheduleTable").classList.toggle("hidden", results.length === 0);
 
   // Judul
-  $("pageTitle").textContent = view === "beranda" ? "Beranda" : "Jadwal " + selectedDay;
   $("dayHeading").textContent = mencari
     ? "Hasil pencarian “" + $("search").value.trim() + "”"
     : "Jadwal Hari " + selectedDay;
@@ -861,35 +1093,100 @@ function renderSchedule() {
       ? results.length + " jadwal ditemukan di semua hari"
       : results.length + " mata pelajaran ditampilkan";
 
-  // Statistik (dihitung dari data)
-  const mapelUnik = new Set(schedule.map(item => item.subject.toLowerCase()));
-  const hariAktif = new Set(schedule.map(item => item.day));
-  $("totalMapel").textContent = mapelUnik.size;
-  $("totalSesi").textContent = schedule.length;
-  $("totalHari").textContent = hariAktif.size + " Hari";
-
-  // Tombol yang aktif (cuma satu yang nyala di sidebar)
+  // Saat mencari, tidak ada tab hari yang aktif (karena hasilnya dari semua hari)
   document.querySelectorAll(".day-tab").forEach(button => {
-    // Saat mencari, tidak ada tab hari yang aktif (karena hasilnya dari semua hari)
     button.classList.toggle("active", !mencari && button.dataset.day === selectedDay);
-  });
-  document.querySelector('[data-view="beranda"]')
-    .classList.toggle("active", view === "beranda");
-  document.querySelectorAll(".nav-button[data-day]").forEach(button => {
-    button.classList.toggle("active", button.dataset.day === view);
   });
 }
 
+// ---- Jadwal mingguan (Senin-Jumat sekaligus) ----
+function renderMingguan() {
+  $("weekGrid").innerHTML = DAYS.map(day => {
+    const items = schedule.filter(item => item.day === day).sort(urutJam);
+    const isToday = hariSekolah() && day === hariIni();
+    const isi = !loaded
+      ? '<div class="week-empty">Memuat...</div>'
+      : items.length
+        ? items.map(item => `
+            <div class="week-item">
+              <span class="time">${escapeHTML(item.time)}</span>
+              <strong>${escapeHTML(item.subject)}</strong>
+              <small>${escapeHTML(item.teacher)}</small>
+            </div>`).join("")
+        : '<div class="week-empty">Belum ada jadwal</div>';
+    return `
+      <div class="week-col ${isToday ? "today" : ""}">
+        <div class="week-head">${day}${isToday ? " (hari ini)" : ""}<span>${items.length} mapel</span></div>
+        ${isi}
+      </div>`;
+  }).join("");
+}
+
+// ---- Riwayat perubahan ----
+function renderRiwayat() {
+  const label = {
+    "tambah":     ["Ditambah", "tag-tambah"],
+    "edit":       ["Diubah", "tag-edit"],
+    "hapus":      ["Dihapus", "tag-hapus"],
+    "kembalikan": ["Dikembalikan", "tag-kembali"],
+    "isi-contoh": ["Isi contoh", "tag-tambah"]
+  };
+
+  $("riwayatList").innerHTML = riwayat.map(r => {
+    const [teks, warna] = label[r.aksi] || [r.aksi, "tag-edit"];
+    return `
+      <li class="log">
+        <span class="tag ${warna}">${escapeHTML(teks)}</span>
+        <div class="log-body">
+          <div><strong>${escapeHTML(r.mapel)}</strong> <span class="log-hari">· ${escapeHTML(r.hari)}</span></div>
+          <div>${escapeHTML(r.detail)}</div>
+          <div class="log-meta">oleh ${escapeHTML(r.oleh)} · ${formatWaktu(r.waktu)}</div>
+        </div>
+      </li>`;
+  }).join("");
+
+  const kosong = !riwayatLoaded || riwayat.length === 0;
+  $("riwayatKosong").textContent = !riwayatLoaded
+    ? "Memuat riwayat..."
+    : "Belum ada perubahan jadwal yang tercatat.";
+  $("riwayatKosong").classList.toggle("hidden", !kosong);
+}
+
+// ---- Daftar siswa (khusus admin) ----
+function renderPengguna() {
+  if (!isAdmin) return;
+  const daftar = [...pengguna].sort((a, b) => new Date(a.dibuat) - new Date(b.dibuat));
+  const jumlahAdmin = daftar.filter(p => ADMIN_USERNAMES.includes(p.username)).length;
+
+  $("penggunaInfo").textContent = !penggunaLoaded
+    ? "Memuat..."
+    : daftar.length + " akun terdaftar · " + (daftar.length - jumlahAdmin) + " siswa, " + jumlahAdmin + " admin";
+
+  $("penggunaBody").innerHTML = daftar.map((p, index) => {
+    const admin = ADMIN_USERNAMES.includes(p.username);
+    return `
+      <tr>
+        <td>${index + 1}</td>
+        <td class="subject">${escapeHTML(p.username)}</td>
+        <td><span class="role ${admin ? "role-admin" : "role-siswa"}">${admin ? "Admin" : "Siswa"}</span></td>
+        <td>${formatTanggal(p.dibuat)}</td>
+        <td>${formatWaktu(p.terakhirMasuk)}</td>
+      </tr>`;
+  }).join("");
+}
+
 // =============================
-// 5. PILIH HARI
+// 6. PINDAH HALAMAN
 // =============================
 
 function bukaHalaman(halaman) {
+  if (halaman === "pengguna" && !isAdmin) halaman = "beranda";
   view = halaman;
-  selectedDay = halaman === "beranda" ? hariIni() : halaman;
+  if (halaman === "beranda") selectedDay = hariIni();
+  if (DAYS.includes(halaman)) selectedDay = halaman;
   $("search").value = "";
   closeForm();
-  renderSchedule();
+  render();
 }
 
 $("dayTabs").addEventListener("click", event => {
@@ -901,14 +1198,14 @@ document.querySelectorAll(".nav-button[data-day]").forEach(button => {
   button.addEventListener("click", () => bukaHalaman(button.dataset.day));
 });
 
-document.querySelector('[data-view="beranda"]').addEventListener("click", () => {
-  bukaHalaman("beranda");
+document.querySelectorAll(".nav-button[data-view]").forEach(button => {
+  button.addEventListener("click", () => bukaHalaman(button.dataset.view));
 });
 
-$("search").addEventListener("input", renderSchedule);
+$("search").addEventListener("input", render);
 
 // =============================
-// 6. TAMBAH DAN EDIT JADWAL
+// 7. TAMBAH DAN EDIT JADWAL
 // =============================
 
 function openForm(item = null) {
@@ -980,30 +1277,33 @@ $("scheduleForm").addEventListener("submit", async event => {
 
   $("saveButton").disabled = true;
   try {
+    const batch = writeBatch(db);
     if (editingId !== null) {
       const lama = schedule.find(row => row.id === editingId);
-      await updateDoc(doc(jadwalCol, editingId), item);
-      showToast("Perubahan disimpan.", { id: lama.id, data: {
-        day: lama.day, time: lama.time, subject: lama.subject, teacher: lama.teacher
-      }});
+      batch.update(doc(jadwalCol, editingId), item);
+      catatRiwayat(batch, "edit", item, apaYangBerubah(lama, item));
+      await batch.commit();
+      showToast("Perubahan disimpan.", { id: lama.id, data: ambilData(lama) });
     } else {
-      await addDoc(jadwalCol, item);
+      batch.set(doc(jadwalCol), item);
+      catatRiwayat(batch, "tambah", item, ringkasan(item));
+      await batch.commit();
       showToast("Jadwal " + subject + " ditambahkan.");
     }
     view = day;
     selectedDay = day;
     $("search").value = "";
     closeForm();
-    renderSchedule();
+    render();
   } catch (error) {
-    tampilkanError("Gagal menyimpan. Cek koneksi internet lalu coba lagi.");
+    tampilkanError(pesanError(error));
   } finally {
     $("saveButton").disabled = false;
   }
 });
 
 // =============================
-// 7. HAPUS JADWAL (bisa di-Urungkan)
+// 8. HAPUS JADWAL (bisa di-Urungkan)
 // =============================
 
 $("scheduleBody").addEventListener("click", async event => {
@@ -1020,12 +1320,13 @@ $("scheduleBody").addEventListener("click", async event => {
   if (button.dataset.action === "delete") {
     if (editingId === item.id) closeForm();
     try {
-      await deleteDoc(doc(jadwalCol, item.id));
-      showToast('"' + item.subject + '" dihapus.', { id: item.id, data: {
-        day: item.day, time: item.time, subject: item.subject, teacher: item.teacher
-      }});
+      const batch = writeBatch(db);
+      batch.delete(doc(jadwalCol, item.id));
+      catatRiwayat(batch, "hapus", item, ringkasan(item));
+      await batch.commit();
+      showToast('"' + item.subject + '" dihapus.', { id: item.id, data: ambilData(item) });
     } catch (error) {
-      showToast("Gagal menghapus. Cek koneksi internet.");
+      showToast(pesanError(error));
     }
   }
 });
@@ -1036,7 +1337,10 @@ $("undoButton").addEventListener("click", async () => {
   const { id, data } = undoData;
   undoData = null;
   try {
-    await setDoc(doc(jadwalCol, id), data);
+    const batch = writeBatch(db);
+    batch.set(doc(jadwalCol, id), data);
+    catatRiwayat(batch, "kembalikan", data, "dikembalikan ke: " + ringkasan(data));
+    await batch.commit();
     showToast("Dikembalikan.");
   } catch (error) {
     showToast("Gagal mengembalikan. Cek koneksi internet.");
@@ -1044,7 +1348,7 @@ $("undoButton").addEventListener("click", async () => {
 });
 
 // =============================
-// 8. ISI JADWAL CONTOH (sekali saja, saat database kosong)
+// 9. ISI JADWAL CONTOH (sekali saja, saat database kosong)
 // =============================
 
 const JADWAL_CONTOH = [
@@ -1079,6 +1383,8 @@ $("seedButton").addEventListener("click", async () => {
     JADWAL_CONTOH.forEach(([day, time, subject, teacher]) => {
       batch.set(doc(jadwalCol), { day, time, subject, teacher });
     });
+    catatRiwayat(batch, "isi-contoh", { day: "Semua hari", subject: "Jadwal contoh" },
+      JADWAL_CONTOH.length + " jadwal contoh ditambahkan");
     await batch.commit();
     showToast("Jadwal contoh ditambahkan.");
   } catch (error) {
@@ -1088,7 +1394,7 @@ $("seedButton").addEventListener("click", async () => {
   }
 });
 
-renderSchedule();
+render();
 </script>
 
 </body>
